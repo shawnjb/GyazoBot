@@ -61,6 +61,20 @@ async def authorize(interaction: discord.Interaction, token: str = None):
         else:
             await interaction.response.send_message("Authorization failed. Please check your token and try again.", ephemeral=True)
 
+@tree.command(name='deauthorize', description='Deauthorize the bot and remove your Gyazo token')
+async def deauthorize(interaction: discord.Interaction):
+    user_id = str(interaction.user.id)
+    
+    c.execute("SELECT token FROM user_tokens WHERE user_id = ?", (user_id,))
+    result = c.fetchone()
+
+    if result:
+        c.execute("DELETE FROM user_tokens WHERE user_id = ?", (user_id,))
+        conn.commit()
+        await interaction.response.send_message("Your Gyazo token has been removed. You have been deauthorized.", ephemeral=True)
+    else:
+        await interaction.response.send_message("You are not authorized, so there's nothing to remove.", ephemeral=True)
+
 async def fetch_all_images_with_cache(token):
     current_time = time.time()
     
