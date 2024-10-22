@@ -5,6 +5,8 @@ import os
 import io
 import discord
 import aiohttp
+import math
+import time
 
 from dotenv import load_dotenv
 from discord.ext import commands
@@ -22,6 +24,12 @@ intents = discord.Intents.default()
 intents.message_content = True
 client = discord.Client(intents=intents)
 tree = discord.app_commands.CommandTree(client)
+
+CACHE_EXPIRY = 60
+image_cache = {
+    'images': [],
+    'last_updated': 0
+}
 
 def save_token(user_id, token):
     c.execute("INSERT OR REPLACE INTO user_tokens (user_id, token) VALUES (?, ?)", (user_id, token))
@@ -53,6 +61,39 @@ async def authorize(interaction: discord.Interaction, token: str = None):
         else:
             await interaction.response.send_message("Authorization failed. Please check your token and try again.", ephemeral=True)
 
+async def fetch_all_images_with_cache(token):
+    current_time = time.time()
+    
+    if current_time - image_cache['last_updated'] < CACHE_EXPIRY:
+        print("Using cached images.")
+        return image_cache['images']
+
+    print("Fetching new images from Gyazo API...")
+    headers = {'Authorization': f'Bearer {token}'}
+    all_images = []
+    page = 1
+    per_page = 20
+
+    while True:
+        params = {'page': page, 'per_page': per_page}
+        response = requests.get('https://api.gyazo.com/api/images', headers=headers, params=params)
+
+        if response.status_code != 200:
+            break
+
+        images = response.json()
+
+        if not images:
+            break
+
+        all_images.extend(images)
+        page += 1
+        
+    image_cache['images'] = all_images
+    image_cache['last_updated'] = current_time
+
+    return all_images
+
 @tree.command(name='lastimages', description='Fetch the most recent images from Gyazo and send them as attachments')
 async def lastimages(interaction: discord.Interaction, count: int = 1):
     MAX_IMAGES = 10
@@ -70,36 +111,27 @@ async def lastimages(interaction: discord.Interaction, count: int = 1):
     count = min(count, MAX_IMAGES)
     await interaction.response.defer()
 
-    headers = {'Authorization': f'Bearer {token}'}
-    response = requests.get('https://api.gyazo.com/api/images', headers=headers)
+    images = await fetch_all_images_with_cache(token)
 
-    if response.status_code == 200:
-        images = response.json()
-        print(f"API Response: {images}")
+    if images:
+        files = []
+        async with aiohttp.ClientSession() as session:
+            for image in images[:count]:
+                img_url = image.get('url') or image.get('thumb_url')
 
-        if images:
-            files = []
-            async with aiohttp.ClientSession() as session:
-                for image in images[:min(count, len(images))]:
-                    img_url = image.get('url') or image.get('thumb_url')
+                if img_url:
+                    async with session.get(img_url) as img_response:
+                        if img_response.status == 200:
+                            data = await img_response.read()
+                            file_name = img_url.split("/")[-1]
+                            files.append(discord.File(io.BytesIO(data), filename=file_name))
 
-                    if img_url:
-                        print(f"Image URL: {img_url}")
-
-                        async with session.get(img_url) as img_response:
-                            if img_response.status == 200:
-                                data = await img_response.read()
-                                file_name = img_url.split("/")[-1]
-                                files.append(discord.File(io.BytesIO(data), filename=file_name))
-
-            if files:
-                await interaction.followup.send(f"Here are your {len(files)} images:", files=files)
-            else:
-                await interaction.followup.send("No valid images to send.")
+        if files:
+            await interaction.followup.send(f"Here are your {len(files)} images:", files=files)
         else:
-            await interaction.followup.send("No images found.")
+            await interaction.followup.send("No valid images to send.")
     else:
-        await interaction.followup.send("Failed to retrieve images. Please check your authorization.")
+        await interaction.followup.send("No images found.")
 
 @tree.command(name='randomimage', description='Fetch a random image from Gyazo and send it as an attachment')
 async def randomimage(interaction: discord.Interaction):
@@ -112,36 +144,26 @@ async def randomimage(interaction: discord.Interaction):
 
     await interaction.response.defer()
 
-    headers = {'Authorization': f'Bearer {token}'}
-    response = requests.get('https://api.gyazo.com/api/images', headers=headers)
+    all_images = await fetch_all_images_with_cache(token)
 
-    if response.status_code == 200:
-        images = response.json()
+    if all_images:
+        random_image = random.choice(all_images)
+        img_url = random_image.get('url') or random_image.get('thumb_url')
 
-        print(f"API Response: {images}")
-
-        if images:
-            random_image = random.choice(images)
-            img_url = random_image.get('url') or random_image.get('thumb_url')
-
-            if img_url:
-                print(f"Random image URL: {img_url}")
-
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(img_url) as img_response:
-                        if img_response.status == 200:
-                            data = await img_response.read()
-                            file_name = img_url.split("/")[-1]
-                            file = discord.File(io.BytesIO(data), filename=file_name)
-                            await interaction.followup.send("Here is a random image:", file=file)
-                        else:
-                            await interaction.followup.send("Failed to download the image.")
-            else:
-                await interaction.followup.send("No valid image URL found.")
+        if img_url:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(img_url) as img_response:
+                    if img_response.status == 200:
+                        data = await img_response.read()
+                        file_name = img_url.split("/")[-1]
+                        file = discord.File(io.BytesIO(data), filename=file_name)
+                        await interaction.followup.send("Here is a random image from all your uploads:", file=file)
+                    else:
+                        await interaction.followup.send("Failed to download the image.")
         else:
-            await interaction.followup.send("No images found.")
+            await interaction.followup.send("No valid image URL found.")
     else:
-        await interaction.followup.send("Failed to retrieve images. Please check your authorization.")
+        await interaction.followup.send("No images found.")
 
 @client.event
 async def on_ready():
