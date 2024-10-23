@@ -5,12 +5,8 @@ import os
 import io
 import discord
 import aiohttp
-import math
 import time
-
 from dotenv import load_dotenv
-from discord.ext import commands
-from discord import File
 
 load_dotenv()
 TOKEN = os.getenv('TOKEN')
