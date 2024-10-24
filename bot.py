@@ -175,6 +175,52 @@ async def randomimage(interaction: discord.Interaction):
     else:
         await interaction.followup.send("No images found.")
 
+@tree.command(name='uploadimage', description='Upload an image from a URL or attachment to Gyazo')
+async def uploadimage(interaction: discord.Interaction, image_url: str = None, image_file: discord.Attachment = None):
+    user_id = str(interaction.user.id)
+    token = get_token(user_id)
+
+    if not token:
+        await interaction.response.send_message("You haven't authorized the bot yet. Use the `/authorize <your_token>` command first.", ephemeral=True)
+        return
+
+    # Ensure either image_url or image_file is provided
+    if image_url is None and image_file is None:
+        await interaction.response.send_message("Please provide either an image URL or attach an image.", ephemeral=True)
+        return
+
+    await interaction.response.defer()
+
+    image_data = None
+
+    # If an image URL is provided
+    if image_url:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(image_url) as response:
+                if response.status == 200:
+                    image_data = await response.read()
+                else:
+                    await interaction.followup.send("Failed to download the image from the URL.")
+                    return
+    elif image_file:
+        # If an image is attached
+        image_data = await image_file.read()
+
+    # Upload to Gyazo
+    headers = {'Authorization': f'Bearer {token}'}
+    form_data = aiohttp.FormData()
+    form_data.add_field('access_token', token)
+    form_data.add_field('imagedata', image_data, filename=image_file.filename if image_file else 'upload.png')
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post('https://upload.gyazo.com/api/upload', data=form_data) as response:
+            if response.status == 200:
+                gyazo_response = await response.json()
+                uploaded_url = gyazo_response['url']
+                await interaction.followup.send(f"Image successfully uploaded to Gyazo: {uploaded_url}")
+            else:
+                await interaction.followup.send("Failed to upload the image to Gyazo.")
+
 @client.event
 async def on_ready():
     print(f'Logged in as {client.user.name}')

@@ -1,17 +1,26 @@
 # Gyazo Bot (Unofficial)
 
-Gyazo Bot allows you to authorize and fetch images from your Gyazo account, including random and recent images, directly within Discord. Please refrain from using this bot or the images it retrieves for AI training data or any machine learning purposes.
+The Gyazo Bot lets you connect your Gyazo account to Discord, making it easy to fetch and share images directly in your Discord chats. You can get your recent images or a random one from your Gyazo gallery.
 
 ## Features
 
-- Securely authorize the bot with your Gyazo access token.
-- Retrieve the most recent or a random image from your Gyazo gallery.
-- Receive images as file attachments in Discord.
+- Connect the bot to your Gyazo account securely with your access token.
+- Retrieve recent or random images from your Gyazo gallery.
+- Send images as file attachments in Discord chats.
 
-> [!CAUTION]
-> This bot stores a database file in the project directory, which is generally excluded from version control using `.gitignore`. Make sure that this file is kept secure, as it contains sensitive data that could provide access to Gyazo accounts.
+> [!IMPORTANT]
+> ⚠️ The bot stores a file with user tokens in the project folder. Make sure to keep this file safe because it contains sensitive data.
 
-## Getting Started
+## Commands
 
-1. Use the `/authorize <token>` command to grant access to the bot. If you need help, do not provide a token and it will show instructions.
-2. Use `/lastimages <count>` to retrieve recent images or `/randomimage` for a random image.
+- `/authorize <token>`: Use this command to connect the bot to your Gyazo account using your access token.
+- `/deauthorize`: Remove your Gyazo token and disconnect the bot from your account.
+- `/lastimages <count>`: Get your most recent images (up to 10) from your Gyazo gallery.
+- `/randomimage`: Get a random image from your Gyazo gallery.
+- `/uploadimage [image_url] [image_file]`: Upload an image to Gyazo. You can either provide a URL or upload an image file as an attachment.
+
+### Getting Started
+
+1. Use `/authorize <token>` to connect the bot to your Gyazo account. If you don’t know how to get your token, leave the command blank, and the bot will give you instructions.
+2. Use `/lastimages <count>` to get recent images or `/randomimage` for a random one.
+3. Upload images with `/uploadimage` by either providing a URL or attaching a file.
