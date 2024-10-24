@@ -184,7 +184,6 @@ async def uploadimage(interaction: discord.Interaction, image_url: str = None, i
         await interaction.response.send_message("You haven't authorized the bot yet. Use the `/authorize <your_token>` command first.", ephemeral=True)
         return
 
-    # Ensure either image_url or image_file is provided
     if image_url is None and image_file is None:
         await interaction.response.send_message("Please provide either an image URL or attach an image.", ephemeral=True)
         return
@@ -193,7 +192,6 @@ async def uploadimage(interaction: discord.Interaction, image_url: str = None, i
 
     image_data = None
 
-    # If an image URL is provided
     if image_url:
         async with aiohttp.ClientSession() as session:
             async with session.get(image_url) as response:
@@ -203,11 +201,8 @@ async def uploadimage(interaction: discord.Interaction, image_url: str = None, i
                     await interaction.followup.send("Failed to download the image from the URL.")
                     return
     elif image_file:
-        # If an image is attached
         image_data = await image_file.read()
 
-    # Upload to Gyazo
-    headers = {'Authorization': f'Bearer {token}'}
     form_data = aiohttp.FormData()
     form_data.add_field('access_token', token)
     form_data.add_field('imagedata', image_data, filename=image_file.filename if image_file else 'upload.png')
